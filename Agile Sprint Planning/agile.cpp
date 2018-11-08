@@ -6,11 +6,11 @@ ILOSTLBEGIN
 
 class Sprint {
 public:
-	IloInt sprintNumber, sprintCapacity, sprintValueBonus;
+	int sprintNumber, sprintCapacity, sprintValueBonus;
 
 	Sprint() {};
 
-	Sprint(IloInt num, IloInt cap, IloInt bonus) {
+	Sprint(int num, int cap, int bonus) {
 		this->sprintNumber = num;
 		this->sprintCapacity = cap;
 		this->sprintValueBonus = bonus;
@@ -27,6 +27,7 @@ class Story {
 public:
 	int storyNumber, storyPoints, businessValue;
 	vector<int> dependencies;
+	// TODO - vector<int> relatedStories;
 
 	Story() {};
 
@@ -65,10 +66,12 @@ public:
 	}
 };
 
+// Returns a random int between min and max (both inclusive)
 int randomIntInclusive(int min, int max) {
 	return rand() % (max - min + 1) + min;
 }
 
+// Returns a vector of Sprint objects filled with random values
 vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int maxCapacity) {
 	vector<Sprint> sprintData;
 
@@ -82,6 +85,7 @@ vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int
 	return sprintData;
 }
 
+// Returns a vector of Story objects filled with random values
 vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue, int maxBusinessValue, int minStoryPoints, int maxStoryPoints, int minDependencies, int maxDependencies) {
 	vector<Story> storyData;
 
@@ -94,19 +98,16 @@ vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue,
 			bool isAlreadyDependency;
 
 			do {
-				// Stop a story being dependent on itself
 				randomStory = randomIntInclusive(0, numberOfStories - 1);
 
-				// Stop adding the same story as a dependency
 				isAlreadyDependency = find(dependencies.begin(), dependencies.end(), randomStory) != dependencies.end();
-			} while (randomStory == i || isAlreadyDependency);
+			} while (randomStory == i || isAlreadyDependency); // Stop a story being dependent on itself or adding duplicate dependencies
 
 			dependencies.push_back(randomStory);
 		}
 		int businessValue = randomIntInclusive(minBusinessValue, maxBusinessValue);
 		int storyPoints = randomIntInclusive(minStoryPoints, maxStoryPoints);
 
-		// Story(storyNumber, businessValue, storyPoints, {dependency1, ..., dependencyN})
 		storyData.push_back(Story(i, businessValue, storyPoints, dependencies));
 	}
 
@@ -114,15 +115,26 @@ vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue,
 }
 
 int main(int argc, char* argv[]) {
+	bool verboseOutput = true;
+
+	if (argc >= 3 && stoi(argv[2]) == 0) {
+		verboseOutput = false;
+	}
+
 	// Seed the random number generator
 	srand(time(NULL));
 
-	// SPRINTS ///////////////////////////////////////////////////////////////////
+	// Randomly generate some sprints
 	const int numberOfSprints = stoi(argv[1]);
-	// randomlyGenerateSprints(numberOfSprints, minCapacity, maxCapacity)
 	vector<Sprint> sprintData = randomlyGenerateSprints(numberOfSprints, 5, 13);
 
-	/*vector<Sprint> sprintData = {
+	// Randomly generate some stories
+	const int numberOfStories = numberOfSprints;
+	vector<Story> storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13, 0, 2);
+
+	/*
+	// Manual test data - if needed
+	vector<Sprint> sprintData = {
 		Sprint(0, 7, 4),
 		Sprint(1, 7, 3),
 		Sprint(2, 7, 2),
@@ -130,12 +142,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	const int numberOfSprints = sprintData.size();*/
-
-	// STORIES ///////////////////////////////////////////////////////////////////
-	const int numberOfStories = numberOfSprints / 2;
-	// randomlyGenerateStories(numberOfStories, minBusinessValue, maxBusinessValue, minStoryPoints, maxStoryPoints, minDependencies, maxDependencies)
-	vector<Story> storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13, 0, 2);
-
+	
 	/*vector<Story> storyData = {
 		Story(0, 2, 6, {}),
 		Story(1, 8, 3, {0}),
@@ -143,7 +150,8 @@ int main(int argc, char* argv[]) {
 		Story(3, 6, 4, {2})
 	};
 
-	const int numberOfStories = storyData.size();*/
+	const int numberOfStories = storyData.size();
+	*/
 
 	IloEnv env;
 
@@ -156,51 +164,55 @@ int main(int argc, char* argv[]) {
 		// Total business value delivered (across the whole roadmap)
 		IloNumExpr deliveredValue(env, 0);
 
-		// Create Boolean decision variables and objective function
 		for (int i = 0; i < numberOfSprints; ++i) {
-			// Sum of story points taken in the sprint
+			// Sum of the story points taken in the sprint i
 			IloNumExpr storyPointsTaken(env, 0);
 
+			// Sprint i is represented by an array of Boolean decision variables
 			sprints[i] = IloBoolVarArray(env, numberOfStories);
 
 			for (int j = 0; j < numberOfStories; ++j) {
-				// Create a Boolean variable
+				// Create a Boolean decision variable
 				sprints[i][j] = IloBoolVar(env);
 
 				// Add business value (including sprint bonus), if story is taken in this sprint
 				deliveredValue += storyData[j].businessValue * sprintData[i].sprintValueBonus * sprints[i][j];
 
-				// Add story points, if story is taken in this sprint
+				// Add story points, if story j is taken in sprint i
 				storyPointsTaken += storyData[j].storyPoints * sprints[i][j];
 			}
 
-			// Add constraint (per sprint): sum of story points taken <= the sprint's capacity
+			// Add constraint (per sprint): sum of story points taken in sprint i <= sprint i's capacity
 			model.add(storyPointsTaken <= sprintData[i].sprintCapacity);
 		}
 
 		// Story is only assiged to one (or no) sprint
 		for (int j = 0; j < numberOfStories; ++j) {
+			// How many times story j is assigned in sprint i
 			IloNumExpr numberOfTimesStoryIsUsed(env, 0);
 
 			for (int i = 0; i < numberOfSprints; ++i) {
 				numberOfTimesStoryIsUsed += sprints[i][j];
 			}
 
+			// Story j can be included in sprint i <= 1 times
 			model.add(numberOfTimesStoryIsUsed <= 1);
 		}
 
-		//////////////////////////////////////////////////////////////////////
+		// Add dependency constraints
 		for (int i = 0; i < numberOfSprints; ++i) {
 			for (int j = 0; j < numberOfStories; ++j) {
-				IloInt numberOfDependencies = storyData[j].dependencies.size();
+				// How many dependencies the story has
+				int numberOfDependencies = storyData[j].dependencies.size();
 
 				for (int d = 0; d < numberOfDependencies; ++d) {
-					// The story number of the dependee
-					IloInt storyToCheck = storyData[j].dependencies[d];
+					// The story number of the dependee story
+					int storyToCheck = storyData[j].dependencies[d];
 
 					// How many times the dependee story has been assigned before to this sprint
 					IloNumExpr numberOfTimesDependeesPreAssigned(env, 0);
 
+					// Count how many times the dependee has been included between the first sprint and the current sprint
 					for (int sprintLookback = 0; sprintLookback < i; ++sprintLookback) {
 						numberOfTimesDependeesPreAssigned += sprints[sprintLookback][storyToCheck];
 					}
@@ -211,7 +223,6 @@ int main(int argc, char* argv[]) {
 				}
 			}
 		}
-		//////////////////////////////////////////////////////////////////////
 
 		// Objective function
 		model.add(IloMaximize(env, deliveredValue));
@@ -222,23 +233,25 @@ int main(int argc, char* argv[]) {
 			cout << endl << "Solution status: " << cplex.getStatus() << endl;
 			cout << "Maximum (weighted) business value = " << cplex.getObjValue() << endl << endl;
 
-			for (int i = 0; i < numberOfSprints; ++i) {
-				// Print Sprint information
-				cout << sprintData[i].toString() << endl;
-				int businessValueDelivered = 0;
+			if (verboseOutput) {
+				for (int i = 0; i < numberOfSprints; ++i) {
+					// Print Sprint information
+					cout << sprintData[i].toString() << endl;
+					int businessValueDelivered = 0;
 
-				for (int j = 0; j < numberOfStories; ++j) {
-					// If the story was taken in this sprint, print its information
-					if (cplex.getValue(sprints[i][j]) == 1) {
-						businessValueDelivered += storyData[j].businessValue;
-						cout << storyData[j].toString() << endl;
+					for (int j = 0; j < numberOfStories; ++j) {
+						// If the story was taken in this sprint, print the story's information
+						if (cplex.getValue(sprints[i][j]) == 1) {
+							businessValueDelivered += storyData[j].businessValue;
+							cout << storyData[j].toString() << endl;
+						}
 					}
+
+					cout << "\t[Delivered: " << to_string(businessValueDelivered) << " business value, "
+						<< to_string(businessValueDelivered * sprintData[i].sprintValueBonus) << " weighted business value]" << endl;
+
+					cout << endl;
 				}
-
-				cout << "\t[Delivered: " << to_string(businessValueDelivered) << " business value, "
-					<< to_string(businessValueDelivered * sprintData[i].sprintValueBonus) << " weighted business value]" << endl;
-
-				cout << endl;
 			}
 		}
 		else {
@@ -249,7 +262,7 @@ int main(int argc, char* argv[]) {
 	catch (IloAlgorithm::CannotExtractException &e) {
 		IloExtractableArray const &failed = e.getExtractables();
 		std::cerr << "Failed to extract:" << std::endl;
-		for (IloInt i = 0; i < failed.getSize(); ++i)
+		for (int i = 0; i < failed.getSize(); ++i)
 			std::cerr << failed[i] << std::endl;
 	}
 	catch (IloException& e) {
