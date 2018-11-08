@@ -23,6 +23,7 @@
     <ProjectGuid>{F677A4C5-57D9-418D-9919-A95CF820750C}</ProjectGuid>
     <RootNamespace>AgileSprintPlanning</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <ProjectName>AgileSprintPlanning</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -47,7 +48,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
@@ -108,13 +109,18 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(CPLEX_STUDIO_DIR128)\cplex\include;$(CPLEX_STUDIO_DIR128)\concert\include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN64;NDEBUG;_CONSOLE;IL_STD;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(CPLEX_STUDIO_DIR128)cplex\lib\x64_windows_vs2017\stat_mda;$(CPLEX_STUDIO_DIR128)\concert\lib\x64_windows_vs2017\stat_mda;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(CPLEX_STUDIO_DIR128)\cplex\lib\x64_windows_vs2017\stat_mda\cplex1280.lib;$(CPLEX_STUDIO_DIR128)\cplex\lib\x64_windows_vs2017\stat_mda\ilocplex.lib;$(CPLEX_STUDIO_DIR128)\concert\lib\x64_windows_vs2017\stat_mda\concert.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="agile.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
