@@ -130,6 +130,11 @@ int main(int argc, char* argv[]) {
 
 	// The maximum number of dependencies that a user story can have
 	int maxStoryDependencies;
+	
+	// TO-DO Implement a random number generator that uses a discrete distribution
+	// (so 0 dependencies is more likely than numberOfStories - 1 dependencies
+
+	bool showSolution = true;
 
 	switch (argc) {
 	case 3:
@@ -151,6 +156,23 @@ int main(int argc, char* argv[]) {
 
 		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13, 0, maxStoryDependencies);
 		sprintData = randomlyGenerateSprints(numberOfSprints, 5, 13);
+
+		break;
+	case 5:
+		numberOfSprints = stoi(argv[1]);
+		numberOfStories = stoi(argv[2]);
+		maxStoryDependencies = stoi(argv[3]);
+
+		if (maxStoryDependencies >= numberOfStories) {
+			maxStoryDependencies = numberOfStories - 1;
+		}
+
+		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13, 0, maxStoryDependencies);
+		sprintData = randomlyGenerateSprints(numberOfSprints, 5, 13);
+		
+		if (stoi(argv[4]) == 0) {
+			showSolution = false;
+		}
 
 		break;
 	default:
@@ -256,23 +278,25 @@ int main(int argc, char* argv[]) {
 			cout << endl << "Solution status: " << cplex.getStatus() << endl;
 			cout << "Maximum (weighted) business value = " << cplex.getObjValue() << endl << endl;
 
-			for (int i = 0; i < numberOfSprints; ++i) {
-				// Print Sprint information
-				cout << sprintData[i].toString() << endl;
-				int businessValueDelivered = 0;
+			if (showSolution) {
+				for (int i = 0; i < numberOfSprints; ++i) {
+					// Print Sprint information
+					cout << sprintData[i].toString() << endl;
+					int businessValueDelivered = 0;
 
-				for (int j = 0; j < numberOfStories; ++j) {
-					// If the story was taken in this sprint, print the story's information
-					if (cplex.getValue(sprints[i][j]) == 1) {
-						businessValueDelivered += storyData[j].businessValue;
-						cout << storyData[j].toString() << endl;
+					for (int j = 0; j < numberOfStories; ++j) {
+						// If the story was taken in this sprint, print the story's information
+						if (cplex.getValue(sprints[i][j]) == 1) {
+							businessValueDelivered += storyData[j].businessValue;
+							cout << storyData[j].toString() << endl;
+						}
 					}
+
+					cout << "\t[Delivered: " << to_string(businessValueDelivered) << " business value, "
+						<< to_string(businessValueDelivered * sprintData[i].sprintValueBonus) << " weighted business value]" << endl;
+
+					cout << endl;
 				}
-
-				cout << "\t[Delivered: " << to_string(businessValueDelivered) << " business value, "
-					<< to_string(businessValueDelivered * sprintData[i].sprintValueBonus) << " weighted business value]" << endl;
-
-				cout << endl;
 			}
 		}
 		else {
