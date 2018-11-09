@@ -115,43 +115,66 @@ vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue,
 }
 
 int main(int argc, char* argv[]) {
-	bool verboseOutput = true;
-
-	if (argc >= 3 && stoi(argv[2]) == 0) {
-		verboseOutput = false;
-	}
-
 	// Seed the random number generator
 	srand(time(NULL));
 
-	// Randomly generate some sprints
-	const int numberOfSprints = stoi(argv[1]);
-	vector<Sprint> sprintData = randomlyGenerateSprints(numberOfSprints, 5, 13);
+	// The number of sprints available in the roadmap
+	int numberOfSprints;
+	// Holds the data about each sprint
+	vector<Sprint> sprintData;
 
-	// Randomly generate some stories
-	const int numberOfStories = numberOfSprints;
-	vector<Story> storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13, 0, 2);
+	// The number of stories in the product backlog
+	int numberOfStories;
+	// Holds the data about each user story
+	vector<Story> storyData;
 
-	/*
-	// Manual test data - if needed
-	vector<Sprint> sprintData = {
-		Sprint(0, 7, 4),
-		Sprint(1, 7, 3),
-		Sprint(2, 7, 2),
-		Sprint(3, 7, 1)
+	// The maximum number of dependencies that a user story can have
+	int maxStoryDependencies;
+
+	switch (argc) {
+	case 3:
+		numberOfSprints = stoi(argv[1]);
+		numberOfStories = stoi(argv[2]);
+
+		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13, 0, numberOfStories / 2);
+		sprintData = randomlyGenerateSprints(numberOfSprints, 5, 13);
+		
+		break;
+	case 4:
+		numberOfSprints = stoi(argv[1]);
+		numberOfStories = stoi(argv[2]);
+		maxStoryDependencies = stoi(argv[3]);
+
+		if (maxStoryDependencies >= numberOfStories) {
+			maxStoryDependencies = numberOfStories - 1;
+		}
+
+		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13, 0, maxStoryDependencies);
+		sprintData = randomlyGenerateSprints(numberOfSprints, 5, 13);
+
+		break;
+	default:
+		// Use some hard-coded test data
+		sprintData = {
+			Sprint(0, 7, 4),
+			Sprint(1, 7, 3),
+			Sprint(2, 7, 2),
+			Sprint(3, 7, 1)
+		};
+
+		numberOfSprints = sprintData.size();
+
+		storyData = {
+			Story(0, 2, 6, {}),
+			Story(1, 8, 3, {0}),
+			Story(2, 2, 1, {1}),
+			Story(3, 6, 4, {2})
+		};
+
+		numberOfStories = storyData.size();
+
+		break;
 	}
-
-	const int numberOfSprints = sprintData.size();*/
-	
-	/*vector<Story> storyData = {
-		Story(0, 2, 6, {}),
-		Story(1, 8, 3, {0}),
-		Story(2, 2, 1, {1}),
-		Story(3, 6, 4, {2})
-	};
-
-	const int numberOfStories = storyData.size();
-	*/
 
 	IloEnv env;
 
@@ -233,25 +256,23 @@ int main(int argc, char* argv[]) {
 			cout << endl << "Solution status: " << cplex.getStatus() << endl;
 			cout << "Maximum (weighted) business value = " << cplex.getObjValue() << endl << endl;
 
-			if (verboseOutput) {
-				for (int i = 0; i < numberOfSprints; ++i) {
-					// Print Sprint information
-					cout << sprintData[i].toString() << endl;
-					int businessValueDelivered = 0;
+			for (int i = 0; i < numberOfSprints; ++i) {
+				// Print Sprint information
+				cout << sprintData[i].toString() << endl;
+				int businessValueDelivered = 0;
 
-					for (int j = 0; j < numberOfStories; ++j) {
-						// If the story was taken in this sprint, print the story's information
-						if (cplex.getValue(sprints[i][j]) == 1) {
-							businessValueDelivered += storyData[j].businessValue;
-							cout << storyData[j].toString() << endl;
-						}
+				for (int j = 0; j < numberOfStories; ++j) {
+					// If the story was taken in this sprint, print the story's information
+					if (cplex.getValue(sprints[i][j]) == 1) {
+						businessValueDelivered += storyData[j].businessValue;
+						cout << storyData[j].toString() << endl;
 					}
-
-					cout << "\t[Delivered: " << to_string(businessValueDelivered) << " business value, "
-						<< to_string(businessValueDelivered * sprintData[i].sprintValueBonus) << " weighted business value]" << endl;
-
-					cout << endl;
 				}
+
+				cout << "\t[Delivered: " << to_string(businessValueDelivered) << " business value, "
+					<< to_string(businessValueDelivered * sprintData[i].sprintValueBonus) << " weighted business value]" << endl;
+
+				cout << endl;
 			}
 		}
 		else {
