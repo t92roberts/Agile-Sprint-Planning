@@ -71,6 +71,9 @@ int randomIntInclusive(int min, int max) {
 	return rand() % (max - min + 1) + min;
 }
 
+// TO-DO - WEIGHTED RANDOM NUMBER GENERATOR USING A DISCRETE DISTRIBUTION
+/////////////////////////////////////////////////////////////////////////
+
 // Returns a vector of Sprint objects filled with random values
 vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int maxCapacity) {
 	vector<Sprint> sprintData;
@@ -86,13 +89,15 @@ vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int
 }
 
 // Returns a vector of Story objects filled with random values
-vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue, int maxBusinessValue, int minStoryPoints, int maxStoryPoints, int minDependencies, int maxDependencies) {
+vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue, int maxBusinessValue, int minStoryPoints, int maxStoryPoints) {
 	vector<Story> storyData;
 
 	for (int i = 0; i < numberOfStories; ++i) {
-		int numberOfDependencies = randomIntInclusive(minDependencies, maxDependencies);
+		int numberOfDependencies = randomIntInclusive(0, numberOfStories - 1);
+
 		vector<int> dependencies = {};
 
+		// TO-DO (maybe) - STOP CIRCULAR DEPENDENCIES CAUSING DEADLOCKS
 		for (int j = 0; j < numberOfDependencies; ++j) {
 			int randomStory;
 			bool isAlreadyDependency;
@@ -137,43 +142,19 @@ int main(int argc, char* argv[]) {
 	bool showSolution = true;
 
 	switch (argc) {
+	case 4:
+		if (stoi(argv[3]) == 0) {
+			showSolution = false;
+		}
+
+		// No break statement as case 4 is identical to case 3, with an extra step
 	case 3:
 		numberOfSprints = stoi(argv[1]);
 		numberOfStories = stoi(argv[2]);
 
-		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13, 0, numberOfStories / 2);
+		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13);
 		sprintData = randomlyGenerateSprints(numberOfSprints, 5, 13);
 		
-		break;
-	case 4:
-		numberOfSprints = stoi(argv[1]);
-		numberOfStories = stoi(argv[2]);
-		maxStoryDependencies = stoi(argv[3]);
-
-		if (maxStoryDependencies >= numberOfStories) {
-			maxStoryDependencies = numberOfStories - 1;
-		}
-
-		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13, 0, maxStoryDependencies);
-		sprintData = randomlyGenerateSprints(numberOfSprints, 5, 13);
-
-		break;
-	case 5:
-		numberOfSprints = stoi(argv[1]);
-		numberOfStories = stoi(argv[2]);
-		maxStoryDependencies = stoi(argv[3]);
-
-		if (maxStoryDependencies >= numberOfStories) {
-			maxStoryDependencies = numberOfStories - 1;
-		}
-
-		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13, 0, maxStoryDependencies);
-		sprintData = randomlyGenerateSprints(numberOfSprints, 5, 13);
-		
-		if (stoi(argv[4]) == 0) {
-			showSolution = false;
-		}
-
 		break;
 	default:
 		// Use some hard-coded test data
