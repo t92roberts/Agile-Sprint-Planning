@@ -67,19 +67,61 @@ public:
 };
 
 // Returns a random int between min and max (both inclusive)
-int randomIntInclusive(int min, int max) {
+int randomInt(int min, int max) {
 	return rand() % (max - min + 1) + min;
 }
 
-// TO-DO - WEIGHTED RANDOM NUMBER GENERATOR USING A DISCRETE DISTRIBUTION
-/////////////////////////////////////////////////////////////////////////
+// Returns an int between min and max (inclusive)
+// The probability of drawing min is highest, decreasingly linearly to max
+int randomIntLinearlyWeighted(int min, int max) {
+	// A list of values to be drawn from where (given max = n):
+	// min appears n times
+	// min + 1 appears n - 1 times
+	vector<int> weightedDistribution;
+	int numberOfRepetitions = max;
+
+	for (int i = min; i <= max; ++i) {
+		for (int j = 0; j <= numberOfRepetitions; ++j) {
+			weightedDistribution.push_back(i);
+		}
+
+		--numberOfRepetitions;
+	}
+
+	// A random place in the new vector of weighted values
+	int randomIndex = randomInt(0, weightedDistribution.size() - 1);
+
+	return weightedDistribution[randomIndex];
+}
+
+// Returns an int between min and max (inclusive)
+// The probability of drawing min is highest, decreasingly exponentially to max
+int randomIntExponentiallyWeighted(int min, int max, int exponent) {
+	vector<int> weightedDistribution;
+
+	int numberOfRepetitions = 1;
+
+	for (int i = max; i >= min; --i) {
+		// Add terms
+		for (int j = 0; j < numberOfRepetitions; ++j) {
+			weightedDistribution.push_back(i);
+		}
+
+		numberOfRepetitions = numberOfRepetitions * exponent;
+	}
+
+	// A random place in the new vector of weighted values
+	int randomIndex = randomInt(0, weightedDistribution.size() - 1);
+
+	return weightedDistribution[randomIndex];
+}
 
 // Returns a vector of Sprint objects filled with random values
 vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int maxCapacity) {
 	vector<Sprint> sprintData;
 
 	for (int i = 0; i < numberOfSprints; ++i) {
-		int capacity = randomIntInclusive(minCapacity, maxCapacity);
+		int capacity = randomInt(minCapacity, maxCapacity);
 
 		// Sprint(sprintNumber, sprintCapacity, sprintBonus)
 		sprintData.push_back(Sprint(i, capacity, numberOfSprints - i));
@@ -93,25 +135,27 @@ vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue,
 	vector<Story> storyData;
 
 	for (int i = 0; i < numberOfStories; ++i) {
-		int numberOfDependencies = randomIntInclusive(0, numberOfStories - 1);
+		//int numberOfDependencies = randomIntLinearlyWeighted(0, numberOfStories - 1);
+		int numberOfDependencies = randomIntExponentiallyWeighted(0, numberOfStories - 1, 2);
 
 		vector<int> dependencies = {};
 
 		// TO-DO (maybe) - STOP CIRCULAR DEPENDENCIES CAUSING DEADLOCKS
+		///////////////////////////////////////////////////////////////
 		for (int j = 0; j < numberOfDependencies; ++j) {
 			int randomStory;
 			bool isAlreadyDependency;
 
 			do {
-				randomStory = randomIntInclusive(0, numberOfStories - 1);
+				randomStory = randomInt(0, numberOfStories - 1);
 
 				isAlreadyDependency = find(dependencies.begin(), dependencies.end(), randomStory) != dependencies.end();
 			} while (randomStory == i || isAlreadyDependency); // Stop a story being dependent on itself or adding duplicate dependencies
 
 			dependencies.push_back(randomStory);
 		}
-		int businessValue = randomIntInclusive(minBusinessValue, maxBusinessValue);
-		int storyPoints = randomIntInclusive(minStoryPoints, maxStoryPoints);
+		int businessValue = randomInt(minBusinessValue, maxBusinessValue);
+		int storyPoints = randomInt(minStoryPoints, maxStoryPoints);
 
 		storyData.push_back(Story(i, businessValue, storyPoints, dependencies));
 	}
