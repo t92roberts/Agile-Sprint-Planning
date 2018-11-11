@@ -89,6 +89,17 @@ int randomIntDiscreteDistribution(vector<double> probabilities) {
 	}
 }
 
+// Uses the parametric equation of a geometric sequence to return a vector of doubles
+vector<double> geometricSequence(double a, double r, double n) {
+	vector<double> sequence;
+
+	for (int i = 0; i < n; ++i) {
+		sequence.push_back(a * pow(r, i));
+	}
+
+	return sequence;
+}
+
 // Returns a vector of Sprint objects filled with random values
 vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int maxCapacity) {
 	vector<Sprint> sprintData;
@@ -108,7 +119,9 @@ vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue,
 	vector<Story> storyData;
 
 	for (int i = 0; i < numberOfStories; ++i) {
-		vector<double> probabilities { 0.5, 0.3, 0.2 };
+		// Geometric sequence of probabilities
+		vector<double> probabilities = geometricSequence(0.5, 0.5, (double)numberOfStories);
+		
 		int numberOfDependencies = randomIntDiscreteDistribution(probabilities);
 
 		vector<int> dependencies = {};
@@ -153,9 +166,7 @@ int main(int argc, char* argv[]) {
 	// The maximum number of dependencies that a user story can have
 	int maxStoryDependencies;
 	
-	// TO-DO Implement a random number generator that uses a discrete distribution
-	// (so 0 dependencies is more likely than numberOfStories - 1 dependencies
-
+	// If the user wants to see the solution
 	bool showSolution = true;
 
 	switch (argc) {
