@@ -54,10 +54,10 @@ public:
 
 			for (int i = 0; i < dependencies.size(); ++i) {
 				if (i == 0) {
-					dependenciesString += to_string(dependencies[i]);
+					dependenciesString += "Story " + to_string(dependencies[i]);
 				}
 				else {
-					dependenciesString += ", " + to_string(dependencies[i]);
+					dependenciesString += ", Story " + to_string(dependencies[i]);
 				}
 			}
 
@@ -71,49 +71,22 @@ int randomInt(int min, int max) {
 	return rand() % (max - min + 1) + min;
 }
 
-// Returns an int between min and max (inclusive)
-// The probability of drawing min is highest, decreasingly linearly to max
-int randomIntLinearlyWeighted(int min, int max) {
-	// A list of values to be drawn from where (given max = n):
-	// min appears n times
-	// min + 1 appears n - 1 times
-	vector<int> weightedDistribution;
-	int numberOfRepetitions = max;
+// Returns a random position in the input vector according to the given probability distribution of getting each position
+int randomIntDiscreteDistribution(vector<double> probabilities) {
+	// Randomly generated percentage
+	double randomPercentage = (double)(rand() % 1024) / 1024;
 
-	for (int i = min; i <= max; ++i) {
-		for (int j = 0; j <= numberOfRepetitions; ++j) {
-			weightedDistribution.push_back(i);
-		}
+	// Threshold representing the upper limit of each probability band
+	double threshold = probabilities[0];
 
-		--numberOfRepetitions;
+	for (int i = 0; i < probabilities.size(); ++i) {
+		// If the random percentage is within this vector position's probability threshold, return the position
+		if (randomPercentage < threshold)
+			return i;
+		else
+			// If not, extend the threshold to the next probability band
+			threshold += probabilities[i + 1];
 	}
-
-	// A random place in the new vector of weighted values
-	int randomIndex = randomInt(0, weightedDistribution.size() - 1);
-
-	return weightedDistribution[randomIndex];
-}
-
-// Returns an int between min and max (inclusive)
-// The probability of drawing min is highest, decreasingly exponentially to max
-int randomIntExponentiallyWeighted(int min, int max, int exponent) {
-	vector<int> weightedDistribution;
-
-	int numberOfRepetitions = 1;
-
-	for (int i = max; i >= min; --i) {
-		// Add terms
-		for (int j = 0; j < numberOfRepetitions; ++j) {
-			weightedDistribution.push_back(i);
-		}
-
-		numberOfRepetitions = numberOfRepetitions * exponent;
-	}
-
-	// A random place in the new vector of weighted values
-	int randomIndex = randomInt(0, weightedDistribution.size() - 1);
-
-	return weightedDistribution[randomIndex];
 }
 
 // Returns a vector of Sprint objects filled with random values
@@ -135,8 +108,8 @@ vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue,
 	vector<Story> storyData;
 
 	for (int i = 0; i < numberOfStories; ++i) {
-		//int numberOfDependencies = randomIntLinearlyWeighted(0, numberOfStories - 1);
-		int numberOfDependencies = randomIntExponentiallyWeighted(0, numberOfStories - 1, 2);
+		vector<double> probabilities { 0.5, 0.3, 0.2 };
+		int numberOfDependencies = randomIntDiscreteDistribution(probabilities);
 
 		vector<int> dependencies = {};
 
@@ -317,7 +290,7 @@ int main(int argc, char* argv[]) {
 						}
 					}
 
-					cout << "\t[Delivered: " << to_string(businessValueDelivered) << " business value, "
+					cout << "\t[Total delivered: " << to_string(businessValueDelivered) << " business value, "
 						<< to_string(businessValueDelivered * sprintData[i].sprintValueBonus) << " weighted business value]" << endl;
 
 					cout << endl;
