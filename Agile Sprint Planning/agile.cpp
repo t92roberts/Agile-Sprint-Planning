@@ -45,7 +45,7 @@ public:
 	}
 
 	string toString() {
-		return "\tStory " + to_string(storyNumber)
+		return "Story " + to_string(storyNumber)
 			+ " (business value: " + to_string(businessValue)
 			+ ", story points: " + to_string(storyPoints)
 			+ ", dependencies: " + printDependencies() + ")";
@@ -120,18 +120,58 @@ vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int
 	return sprintData;
 }
 
-// Returns whether adding the 'target' story as a dependency of the 'root' story would create a cycle in the graph of dependencies
-bool createsACycle(Story rootStory, Story targetStory, vector<Story> allNodes) {
-	for (int i = 0; i < targetStory.dependencies.size(); ++i) {
-		int storyNumber = targetStory.dependencies[i];
+/*
+// Adapted from:
+// GeeksforGeeks. (2018). Detect Cycle in a Directed Graph - GeeksforGeeks. [online] Available at: https://www.geeksforgeeks.org/detect-cycle-in-a-graph/ [Accessed 12 Nov. 2018].
+// This function is a variation of DFSUytil() in https://www.geeksforgeeks.org/archives/18212 
+*/
+// Helper function that recursively steps through the directed graph to find a cycle
+bool _isCyclic(int v, bool visited[], bool *recStack, vector <Story> allStories) {
+	if (!visited[v]) {
+		// Mark the current story as visited and part of recursion stack
+		visited[v] = true;
+		recStack[v] = true;
 
-		// Check if the root story is already one of the target story's dependencies
-		if (rootStory.storyNumber == storyNumber)
-			return true;
-		
-		// A disjunction of the recursive calls ensures that if at least one cycle is found, the root call returns true
-		return false || createsACycle(rootStory, allNodes[storyNumber], allNodes);
+		// Recur for all the dependencies of this story 
+		vector<int> dependencies = allStories[v].dependencies;
+
+		vector<int>::iterator i;
+		for (i = dependencies.begin(); i != dependencies.end(); ++i) {
+			int dependeeStoryNumber = *i;
+			if(!visited[dependeeStoryNumber] && _isCyclic(dependeeStoryNumber, visited, recStack, allStories))
+				return true;
+			else if (recStack[dependeeStoryNumber])
+				return true;
+		}
 	}
+
+	recStack[v] = false; // remove the story from recursion stack
+	return false;
+}
+
+/*
+// Adapted from:
+// GeeksforGeeks. (2018). Detect Cycle in a Directed Graph - GeeksforGeeks. [online] Available at: https://www.geeksforgeeks.org/detect-cycle-in-a-graph/ [Accessed 12 Nov. 2018].
+// This function is a variation of DFS() in https://www.geeksforgeeks.org/archives/18212 
+*/
+// Returns true if the DAG of dependencies between stories has a cycle, false if not
+bool isCyclic(vector <Story> allStories) {
+	// Mark all the stories as not visited and not part of recursion stack
+	bool *visited = new bool[allStories.size()];
+	bool *recStack = new bool[allStories.size()];
+
+	for (int i = 0; i < allStories.size(); ++i) {
+		visited[i] = false;
+		recStack[i] = false;
+	}
+
+	// Call the recursive helper function on each story to detect cycles in different DFS trees
+	for (int i = 0; i < allStories.size(); ++i) {
+		if (_isCyclic(i, visited, recStack, allStories))
+			return true;
+	}
+
+	return false;
 }
 
 // Returns a vector of Story objects filled with random values
@@ -154,28 +194,33 @@ vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue,
 		// (can't force a specific number of dependencies as it might create cycles in the graph of dependencies between stories)
 		int maxNumberOfDependencies = randomIntDiscreteDistribution(probabilities);
 
-		vector<int> dependencyList = {};
-
 		for (int j = 0; j < maxNumberOfDependencies; ++j) {
 			// Pick a random story as a potential dependency of story i
 			int potentialDependee = randomInt(0, numberOfStories - 1);
 
 			// Check if the dependency is the same as story i
-			bool isDuplicate = potentialDependee == i;
+			bool isSelfLoop = potentialDependee == i;
 
 			// Check if the dependency is already a dependency of story i
-			bool isAlreadyDependency = find(dependencyList.begin(), dependencyList.end(), potentialDependee) != dependencyList.end();
+			bool isAlreadyDependency = find(storyData[i].dependencies.begin(), storyData[i].dependencies.end(), potentialDependee) != storyData[i].dependencies.end();
 
-			// Check if adding the dependency would create a cycle in the graph of dependencies (which makes it unsolvable)
-			bool dependencyCreatesCycle = createsACycle(storyData[i], storyData[potentialDependee], storyData);
+			// Retry with another random story
+			if (isSelfLoop || isAlreadyDependency) {
+				--j;
+				continue;
+			}
 
-			if (!isDuplicate && !isAlreadyDependency && !dependencyCreatesCycle)
-				dependencyList.push_back(potentialDependee);
+			// Add the dependency to story i
+			storyData[i].dependencies.push_back(potentialDependee);
+
+			// Check if adding the dependency created a cycle in the graph of dependencies (which makes it unsolvable)
+			bool dependencyCreatesCycle = isCyclic(storyData);
+			
+			if (dependencyCreatesCycle) {
+				// Remove the offending dependency
+				storyData[i].dependencies.pop_back();
+			}
 		}
-
-		// Add the validated list of dependencies to story i
-		storyData[i].dependencies = dependencyList;
-		
 	}
 
 	return storyData;
@@ -209,8 +254,9 @@ int main(int argc, char* argv[]) {
 		numberOfSprints = stoi(argv[1]);
 		numberOfStories = stoi(argv[2]);
 
-		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13);
-		sprintData = randomlyGenerateSprints(numberOfSprints, 1, 13);
+		// Generate some test data to optimise
+		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 10);
+		sprintData = randomlyGenerateSprints(numberOfSprints, 5, 10);
 		
 		break;
 	default:
@@ -235,9 +281,6 @@ int main(int argc, char* argv[]) {
 
 		break;
 	}
-
-	for (int i = 0; i < storyData.size(); ++i)
-		cout << storyData[i].toString() << endl;
 
 	IloEnv env;
 
@@ -316,10 +359,25 @@ int main(int argc, char* argv[]) {
 		IloCplex cplex(model);
 
 		if (cplex.solve()) {
-			cout << endl << "Solution status: " << cplex.getStatus() << endl;
-			cout << "Maximum (weighted) business value = " << cplex.getObjValue() << endl << endl;
-
 			if (showSolution) {
+				cout << endl << "Product backlog: " << endl << endl;
+
+				for (int i = 0; i < storyData.size(); ++i) {
+					cout << storyData[i].toString() << endl;
+				}
+
+				cout << endl << "Available sprints: " << endl << endl;
+
+				for (int i = 0; i < sprintData.size(); ++i) {
+					cout << sprintData[i].toString() << endl;
+				}
+
+				cout << endl << "---------------------------------------------------------" << endl << endl;
+
+				int totalBusinessValueDelivered = 0;
+
+				cout << "Sprint plan:" << endl << endl;
+
 				for (int i = 0; i < numberOfSprints; ++i) {
 					// Print Sprint information
 					cout << sprintData[i].toString() << endl;
@@ -329,15 +387,19 @@ int main(int argc, char* argv[]) {
 						// If the story was taken in this sprint, print the story's information
 						if (cplex.getValue(sprints[i][j]) == 1) {
 							businessValueDelivered += storyData[j].businessValue;
-							cout << storyData[j].toString() << endl;
+							totalBusinessValueDelivered += storyData[j].businessValue;
+
+							cout << "\t" << storyData[j].toString() << endl;
 						}
 					}
 
-					cout << "\t[Total delivered: " << to_string(businessValueDelivered) << " business value, "
-						<< to_string(businessValueDelivered * sprintData[i].sprintValueBonus) << " weighted business value]" << endl;
-
-					cout << endl;
+					cout << "-- [Total delivered: " << to_string(businessValueDelivered) << " business value, "
+						<< to_string(businessValueDelivered * sprintData[i].sprintValueBonus) << " weighted business value]" << endl << endl;
 				}
+
+				cout << endl << "Solution status: " << cplex.getStatus() << endl;
+				cout << "Total business value delivered: " << totalBusinessValueDelivered << endl;
+				cout << "Total weighted business value: " << cplex.getObjValue() << endl << endl;
 			}
 		}
 		else {
