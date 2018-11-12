@@ -31,6 +31,12 @@ public:
 
 	Story() {};
 
+	Story(int num, int bv, int sp) {
+		this->storyNumber = num;
+		this->businessValue = bv;
+		this->storyPoints = sp;
+	}
+
 	Story(int num, int bv, int sp, vector<int> d) {
 		this->storyNumber = num;
 		this->businessValue = bv;
@@ -114,36 +120,62 @@ vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int
 	return sprintData;
 }
 
+// Returns whether adding the 'target' story as a dependency of the 'root' story would create a cycle in the graph of dependencies
+bool createsACycle(Story rootStory, Story targetStory, vector<Story> allNodes) {
+	for (int i = 0; i < targetStory.dependencies.size(); ++i) {
+		int storyNumber = targetStory.dependencies[i];
+
+		// Check if the root story is already one of the target story's dependencies
+		if (rootStory.storyNumber == storyNumber)
+			return true;
+		
+		// A disjunction of the recursive calls ensures that if at least one cycle is found, the root call returns true
+		return false || createsACycle(rootStory, allNodes[storyNumber], allNodes);
+	}
+}
+
 // Returns a vector of Story objects filled with random values
 vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue, int maxBusinessValue, int minStoryPoints, int maxStoryPoints) {
 	vector<Story> storyData;
 
+	// Geometric sequence of probabilities for the discrete distribution random number generator
+	vector<double> probabilities = geometricSequence(0.5, 0.5, (double)numberOfStories);
+
+	// Create stories with random values
 	for (int i = 0; i < numberOfStories; ++i) {
-		// Geometric sequence of probabilities
-		vector<double> probabilities = geometricSequence(0.5, 0.5, (double)numberOfStories);
-		
-		int numberOfDependencies = randomIntDiscreteDistribution(probabilities);
-
-		vector<int> dependencies = {};
-
-		// TO-DO (maybe) - STOP CIRCULAR DEPENDENCIES CAUSING DEADLOCKS
-		///////////////////////////////////////////////////////////////
-		for (int j = 0; j < numberOfDependencies; ++j) {
-			int randomStory;
-			bool isAlreadyDependency;
-
-			do {
-				randomStory = randomInt(0, numberOfStories - 1);
-
-				isAlreadyDependency = find(dependencies.begin(), dependencies.end(), randomStory) != dependencies.end();
-			} while (randomStory == i || isAlreadyDependency); // Stop a story being dependent on itself or adding duplicate dependencies
-
-			dependencies.push_back(randomStory);
-		}
 		int businessValue = randomInt(minBusinessValue, maxBusinessValue);
 		int storyPoints = randomInt(minStoryPoints, maxStoryPoints);
 
-		storyData.push_back(Story(i, businessValue, storyPoints, dependencies));
+		storyData.push_back(Story(i, businessValue, storyPoints));
+	}
+
+	for (int i = 0; i < numberOfStories; ++i) {
+		// The maximum number of dependencies that story i can have
+		// (can't force a specific number of dependencies as it might create cycles in the graph of dependencies between stories)
+		int maxNumberOfDependencies = randomIntDiscreteDistribution(probabilities);
+
+		vector<int> dependencyList = {};
+
+		for (int j = 0; j < maxNumberOfDependencies; ++j) {
+			// Pick a random story as a potential dependency of story i
+			int potentialDependee = randomInt(0, numberOfStories - 1);
+
+			// Check if the dependency is the same as story i
+			bool isDuplicate = potentialDependee == i;
+
+			// Check if the dependency is already a dependency of story i
+			bool isAlreadyDependency = find(dependencyList.begin(), dependencyList.end(), potentialDependee) != dependencyList.end();
+
+			// Check if adding the dependency would create a cycle in the graph of dependencies (which makes it unsolvable)
+			bool dependencyCreatesCycle = createsACycle(storyData[i], storyData[potentialDependee], storyData);
+
+			if (!isDuplicate && !isAlreadyDependency && !dependencyCreatesCycle)
+				dependencyList.push_back(potentialDependee);
+		}
+
+		// Add the validated list of dependencies to story i
+		storyData[i].dependencies = dependencyList;
+		
 	}
 
 	return storyData;
@@ -162,9 +194,6 @@ int main(int argc, char* argv[]) {
 	int numberOfStories;
 	// Holds the data about each user story
 	vector<Story> storyData;
-
-	// The maximum number of dependencies that a user story can have
-	int maxStoryDependencies;
 	
 	// If the user wants to see the solution
 	bool showSolution = true;
@@ -181,7 +210,7 @@ int main(int argc, char* argv[]) {
 		numberOfStories = stoi(argv[2]);
 
 		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 13);
-		sprintData = randomlyGenerateSprints(numberOfSprints, 5, 13);
+		sprintData = randomlyGenerateSprints(numberOfSprints, 1, 13);
 		
 		break;
 	default:
@@ -206,6 +235,9 @@ int main(int argc, char* argv[]) {
 
 		break;
 	}
+
+	for (int i = 0; i < storyData.size(); ++i)
+		cout << storyData[i].toString() << endl;
 
 	IloEnv env;
 
