@@ -349,6 +349,9 @@ int main(int argc, char* argv[]) {
 					// sprints[i][j] == 1 means that dependent story j is taken in sprint i, so dependee story d must appear in previous sprints
 					// sprints[i][j] == 0 means that dependent story j is not taken in sprint i, so dependee story d may or may not appear in previous sprints
 					model.add(IloIfThen(env, sprints[i][j] == 1, numberOfTimesDependeesPreAssigned == 1));
+
+					// NOTE - adding a separate constraint here for each dependee, rather than for each story, seems to make it terminate in less time.
+					// Possibly a symptom of phase transitions in CSPs?
 				}
 			}
 		}
@@ -374,6 +377,7 @@ int main(int argc, char* argv[]) {
 
 				cout << endl << "---------------------------------------------------------" << endl << endl;
 
+				int storiesDelivered = 0;
 				int totalBusinessValueDelivered = 0;
 
 				cout << "Sprint plan:" << endl << endl;
@@ -388,6 +392,7 @@ int main(int argc, char* argv[]) {
 						if (cplex.getValue(sprints[i][j]) == 1) {
 							businessValueDelivered += storyData[j].businessValue;
 							totalBusinessValueDelivered += storyData[j].businessValue;
+							storiesDelivered += 1;
 
 							cout << "\t" << storyData[j].toString() << endl;
 						}
@@ -398,6 +403,7 @@ int main(int argc, char* argv[]) {
 				}
 
 				cout << endl << "Solution status: " << cplex.getStatus() << endl;
+				cout << "Stories delivered: " << storiesDelivered << "/" << storyData.size() << " (" << 100.0 * (double)storiesDelivered / (double)storyData.size() << "%)" << endl;
 				cout << "Total business value delivered: " << totalBusinessValueDelivered << endl;
 				cout << "Total weighted business value: " << cplex.getObjValue() << endl << endl;
 			}
