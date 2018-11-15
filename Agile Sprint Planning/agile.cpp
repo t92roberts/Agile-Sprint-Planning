@@ -4,6 +4,32 @@
 #include <algorithm>
 ILOSTLBEGIN
 
+/*
+//	TODO (maybe) - change the model to fill each team members' capacity rather than fill sprints
+//					- changes the focus to making sure that people have work to do rather than the sprint is filled
+//
+//	Model a team member
+//		- ID
+//		- First + last name
+//		- List of competencies
+//			- Ordered list?
+//		- Personal sprint velocity (default 8 - or whatever the rule-of-thumb is for an FTE)
+//		- Personal sprint backlog vector<Story>
+//
+//	Modify Story class
+//		- List of compentencies required
+//			- Check that a team member has all of the compentencies required by the story
+//
+//	The objective is to assign stories to team members in each sprint
+//		- 3 dimensional Boolean array?
+//			- sprints[sprint][story][teamMember]
+//		- Assigning a story to a team member adds a story to their personal backlog
+//		- Each team member: constraint where 0 < personal story points <= velocity
+//		- If there are > 1 sprints, personal backlogs are wiped after each sprint to allow adding stories for the next sprint
+//		- Give a bonus for filling a team member's backlog
+//			- maybe use the % utilisation? (sum of story points / velocity)
+*/
+
 class Sprint {
 public:
 	int sprintNumber, sprintCapacity, sprintValueBonus;
@@ -72,7 +98,7 @@ public:
 	}
 };
 
-// Returns a random int between min and max (both inclusive)
+// Returns a random int between min and max (both inclusive) using a uniform distribution
 int randomInt(int min, int max) {
 	return rand() % (max - min + 1) + min;
 }
@@ -104,20 +130,6 @@ vector<double> geometricSequence(double a, double r, double n) {
 	}
 
 	return sequence;
-}
-
-// Returns a vector of Sprint objects filled with random values
-vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int maxCapacity) {
-	vector<Sprint> sprintData;
-
-	for (int i = 0; i < numberOfSprints; ++i) {
-		int capacity = randomInt(minCapacity, maxCapacity);
-
-		// Sprint(sprintNumber, sprintCapacity, sprintBonus)
-		sprintData.push_back(Sprint(i, capacity, numberOfSprints - i));
-	}
-
-	return sprintData;
 }
 
 /*
@@ -226,6 +238,20 @@ vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue,
 	return storyData;
 }
 
+// Returns a vector of Sprint objects filled with random values
+vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int maxCapacity) {
+	vector<Sprint> sprintData;
+
+	for (int i = 0; i < numberOfSprints; ++i) {
+		int capacity = randomInt(minCapacity, maxCapacity);
+
+		// Sprint(sprintNumber, sprintCapacity, sprintBonus)
+		sprintData.push_back(Sprint(i, capacity, numberOfSprints - i));
+	}
+
+	return sprintData;
+}
+
 int main(int argc, char* argv[]) {
 	// Seed the random number generator
 	srand(time(NULL));
@@ -255,12 +281,12 @@ int main(int argc, char* argv[]) {
 		numberOfStories = stoi(argv[2]);
 
 		// Generate some test data to optimise
-		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 10);
-		sprintData = randomlyGenerateSprints(numberOfSprints, 5, 10);
+		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 8);
+		sprintData = randomlyGenerateSprints(numberOfSprints, 4, 8);
 		
 		break;
 	default:
-		// Use some hard-coded test data
+		// If no parameters are given, use some hard-coded test data
 		sprintData = {
 			Sprint(0, 7, 4),
 			Sprint(1, 7, 3),
@@ -350,14 +376,24 @@ int main(int argc, char* argv[]) {
 					// sprints[i][j] == 0 means that dependent story j is not taken in sprint i, so dependee story d may or may not appear in previous sprints
 					model.add(IloIfThen(env, sprints[i][j] == 1, numberOfTimesDependeesPreAssigned == 1));
 
-					// NOTE - adding a separate constraint here for each dependee, rather than for each story, seems to make it terminate in less time.
-					// Possibly a symptom of phase transitions in CSPs?
+					// NOTE - is numberOfTimesDependeesPreAssigned == 1 (per dependee, per story) better than numberOfTimesDependeesPreAssigned == numberOfDependencies (per story)?
+					// i.e. is it better to have more or fewer constraints that check the same thing?
 				}
 			}
 		}
 
 		// Objective function
 		model.add(IloMaximize(env, deliveredValue));
+
+		// Calculate the total size of the product backlog
+
+		int maxBusinessValuePossible = 0;
+		int maxStoryPointsPossible = 0;
+
+		for (int i = 0; i < storyData.size(); ++i) {
+			maxBusinessValuePossible += storyData[i].businessValue;
+			maxStoryPointsPossible += storyData[i].storyPoints;
+		}
 
 		IloCplex cplex(model);
 
@@ -377,13 +413,15 @@ int main(int argc, char* argv[]) {
 
 				cout << endl << "---------------------------------------------------------" << endl << endl;
 
-				int storiesDelivered = 0;
+				int totalStoriesDelivered = 0;
 				int totalBusinessValueDelivered = 0;
+				int totalStoryPointsDelivered = 0;
 
 				cout << "Sprint plan:" << endl << endl;
 
+				// Output the solution
 				for (int i = 0; i < numberOfSprints; ++i) {
-					// Print Sprint information
+					// Sprint information
 					cout << sprintData[i].toString() << endl;
 					int businessValueDelivered = 0;
 
@@ -391,21 +429,31 @@ int main(int argc, char* argv[]) {
 						// If the story was taken in this sprint, print the story's information
 						if (cplex.getValue(sprints[i][j]) == 1) {
 							businessValueDelivered += storyData[j].businessValue;
+
+							// Running totals for how much the roadmap delivered overall
 							totalBusinessValueDelivered += storyData[j].businessValue;
-							storiesDelivered += 1;
+							totalStoriesDelivered += 1;
+							totalStoryPointsDelivered += storyData[j].storyPoints;
 
 							cout << "\t" << storyData[j].toString() << endl;
 						}
 					}
 
+					// What was delivered in the sprint
 					cout << "-- [Total delivered: " << to_string(businessValueDelivered) << " business value, "
 						<< to_string(businessValueDelivered * sprintData[i].sprintValueBonus) << " weighted business value]" << endl << endl;
 				}
 
-				cout << endl << "Solution status: " << cplex.getStatus() << endl;
-				cout << "Stories delivered: " << storiesDelivered << "/" << storyData.size() << " (" << 100.0 * (double)storiesDelivered / (double)storyData.size() << "%)" << endl;
-				cout << "Total business value delivered: " << totalBusinessValueDelivered << endl;
-				cout << "Total weighted business value: " << cplex.getObjValue() << endl << endl;
+				cout << endl << "Solution status: " << cplex.getStatus() << endl << endl;
+				cout << "Stories delivered: " << totalStoriesDelivered << "/" << storyData.size() << " (" << 100.0 * (double)totalStoriesDelivered / (double)storyData.size() << "%)" << endl;
+
+				cout << "Total business value delivered: " << totalBusinessValueDelivered << "/" << maxBusinessValuePossible
+					<< " (" << 100.0 * (double)totalBusinessValueDelivered / (double)maxBusinessValuePossible << "%)" << endl;
+
+				cout << "Total story points delivered: " << totalStoryPointsDelivered << "/" << maxStoryPointsPossible
+					<< " (" << 100.0 * (double)totalStoryPointsDelivered / (double)maxStoryPointsPossible << "%)" << endl;
+
+				cout << endl << "Total weighted business value: " << cplex.getObjValue() << endl << endl;
 			}
 		}
 		else {
