@@ -2,33 +2,11 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <set>
+#include <tuple>
 ILOSTLBEGIN
 
-/*
-//	TODO (maybe) - change the model to fill each team members' capacity rather than fill sprints
-//					- changes the focus to making sure that people have work to do rather than the sprint is filled
-//
-//	Model a team member
-//		- ID
-//		- First + last name
-//		- List of competencies
-//			- Ordered list?
-//		- Personal sprint velocity (default 8 - or whatever the rule-of-thumb is for an FTE)
-//		- Personal sprint backlog vector<Story>
-//
-//	Modify Story class
-//		- List of compentencies required
-//			- Check that a team member has all of the compentencies required by the story
-//
-//	The objective is to assign stories to team members in each sprint
-//		- 3 dimensional Boolean array?
-//			- sprints[sprint][story][teamMember]
-//		- Assigning a story to a team member adds a story to their personal backlog
-//		- Each team member: constraint where 0 < personal story points <= velocity
-//		- If there are > 1 sprints, personal backlogs are wiped after each sprint to allow adding stories for the next sprint
-//		- Give a bonus for filling a team member's backlog
-//			- maybe use the % utilisation? (sum of story points / velocity)
-*/
+using namespace std;
 
 class Sprint {
 public:
@@ -95,6 +73,30 @@ public:
 
 			return dependenciesString;
 		}
+	}
+};
+
+class Point {
+public:
+	int x, y;
+
+	Point() {};
+
+	Point(int newX, int newY) {
+		this->x = newX;
+		this->y = newY;
+	}
+
+	// Returns true if the first point is before the second point
+	bool operator<(Point point) {
+		if (this->x < point.x)
+			return true;
+		else if (this->x > point.x)
+			return false;
+		else if (this->y < point.y)
+			return true;
+		else
+			return false;
 	}
 };
 
@@ -252,9 +254,138 @@ vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int
 	return sprintData;
 }
 
+// Return a set of moves for a solution
+set<tuple<int, int, int, int>> getMoves(vector<vector<bool>> roadmap) {
+	// A set of unique swaps possible from the given solution
+	set<tuple<int, int, int, int>> moves;
+
+	// Iterate through every decision variable
+	for (int x1 = 0; x1 < roadmap.size(); ++x1) {
+		for (int y1 = 0; y1 < roadmap[x1].size(); ++y1) {
+
+			// Iterate through every decision variable again
+			for (int x2 = 0; x2 < roadmap.size(); ++x2) {
+				for (int y2 = 0; y2 < roadmap[x2].size(); ++y2) {
+					Point point1 = Point(x1, y1);
+					Point point2 = Point(x2, y2);
+
+					// Don't swap with itself
+					if (!(point1.x == point2.x && point1.y == point2.y)) {
+						// Avoid duplicate moves by converting the move into a canonical format (by sorting the 2 points)
+						if (point1 < point2) {
+							moves.insert(make_tuple(x1, y1, x2, y2));
+						}
+						else {
+							moves.insert(make_tuple(x2, y2, x1, y1));
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	return moves;
+}
+
+// Apply a move to the given state, return the new state
+vector<vector<bool>> applyMove(vector<vector<bool>> solution, Point point1, Point point2) {
+	bool temp = solution[point1.x][point1.y];
+	solution[point1.x][point1.y] = solution[point2.x][point2.y];
+	solution[point2.x][point2.y] = temp;
+
+	return solution;
+}
+
 int main(int argc, char* argv[]) {
 	// Seed the random number generator
 	srand(time(NULL));
+
+	int localSearchSprints = 2;
+	int localSearchStories = 3;
+
+	// Test - an initial feasible solution
+	vector<vector<bool>> roadmap(localSearchSprints, vector<bool>(localSearchStories, false));
+
+	roadmap[0][0] = 1;
+	roadmap[0][1] = 0;
+	roadmap[0][2] = 0;
+	roadmap[1][0] = 0;
+	roadmap[1][1] = 1;
+	roadmap[1][2] = 0;
+
+	cout << "Solution:" << endl << endl;
+
+	for (int i = 0; i < roadmap.size(); ++i) {
+		for (int j = 0; j < roadmap[i].size(); ++j) {
+			cout << roadmap[i][j] << " ";
+		}
+
+		cout << endl;
+	}
+
+	cout << endl << "Moves:" << endl << endl;
+
+	// Set of possible moves, with duplicate moves removed
+	set<tuple<int, int, int, int>> moveSet = getMoves(roadmap);
+
+	// Set of possible moves, with duplicate moves removed
+	vector<tuple<Point, Point>> moves;
+
+	// Convert the set to a vector of moves (tuple<Point, Point>)
+	for (set<tuple<int, int, int, int>>::iterator move = moveSet.begin(); move != moveSet.end(); move++) {
+		int x1 = get<0>(*move);
+		int y1 = get<1>(*move);
+		int x2 = get<2>(*move);
+		int y2 = get<3>(*move);
+
+		moves.push_back(make_tuple(Point(x1, y1), Point(x2, y2)));
+	}
+
+	// Print moves
+	for (int i = 0; i < moves.size(); ++i) {
+		cout << "Move " << i << ": ";
+		cout << "[" << get<0>(moves[i]).x << "][" << get<0>(moves[i]).y << "] <-> ";
+		cout << "[" << get<1>(moves[i]).x << "][" << get<1>(moves[i]).y << "]";
+		cout << endl;
+	}
+
+	cout << endl << "Number of moves: " << moves.size() << endl;
+	
+	cout << endl << "Neighbourhood:" << endl << endl;
+
+	// Set of neighbour states
+	vector<vector<vector<bool>>> neighbours;
+	
+	for (int i = 0; i < moves.size(); ++i) {
+		Point point1 = get<0>(moves[i]);
+		Point point2 = get<1>(moves[i]);
+
+		if (roadmap[point1.x][point1.y] != roadmap[point2.x][point2.y]) { // Swapping identical values means the swap changes nothing
+			cout << "Move " << i << ": " << endl;
+
+			vector<vector<bool>> neighbour = applyMove(roadmap, point1, point2);
+			neighbours.push_back(neighbour);
+
+			for (int m = 0; m < neighbour.size(); ++m) {
+				for (int n = 0; n < neighbour[m].size(); ++n) {
+					cout << neighbour[m][n] << " ";
+				}
+
+				cout << endl;
+			}
+
+			cout << endl;
+		}
+	}
+
+	cout << "Number of neighbours: " << neighbours.size() << endl;
+
+	// REMOVE BEFORE FINALISING /////////////////////////
+	exit(0);
+	// REMOVE BEFORE FINALISING /////////////////////////
+
+	// The number of full time employees able to work on tasks (to estimate the sprint velocity)
+	int numberOfFTEs = 5;
 
 	// The number of sprints available in the roadmap
 	int numberOfSprints;
@@ -282,7 +413,7 @@ int main(int argc, char* argv[]) {
 
 		// Generate some test data to optimise
 		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 8);
-		sprintData = randomlyGenerateSprints(numberOfSprints, 4, 8);
+		sprintData = randomlyGenerateSprints(numberOfSprints, 0, 8 * numberOfFTEs);
 		
 		break;
 	default:
@@ -313,8 +444,8 @@ int main(int argc, char* argv[]) {
 	try {
 		IloModel model(env);
 
-		// 2D array of Boolean decision variables (sprints[i][j] == 1 means user story j is taken in sprint i)
-		IloArray<IloBoolVarArray> sprints(env, numberOfSprints);
+		// 2D array of Boolean decision variables (roadmap[i][j] == 1 means user story j is taken in sprint i)
+		IloArray<IloBoolVarArray> roadmap(env, numberOfSprints);
 
 		// Total business value delivered (across the whole roadmap)
 		IloNumExpr deliveredValue(env, 0);
@@ -324,17 +455,17 @@ int main(int argc, char* argv[]) {
 			IloNumExpr storyPointsTaken(env, 0);
 
 			// Sprint i is represented by an array of Boolean decision variables
-			sprints[i] = IloBoolVarArray(env, numberOfStories);
+			roadmap[i] = IloBoolVarArray(env, numberOfStories);
 
 			for (int j = 0; j < numberOfStories; ++j) {
 				// Create a Boolean decision variable
-				sprints[i][j] = IloBoolVar(env);
+				roadmap[i][j] = IloBoolVar(env);
 
 				// Add business value (including sprint bonus), if story is taken in this sprint
-				deliveredValue += storyData[j].businessValue * sprintData[i].sprintValueBonus * sprints[i][j];
+				deliveredValue += storyData[j].businessValue * sprintData[i].sprintValueBonus * roadmap[i][j];
 
 				// Add story points, if story j is taken in sprint i
-				storyPointsTaken += storyData[j].storyPoints * sprints[i][j];
+				storyPointsTaken += storyData[j].storyPoints * roadmap[i][j];
 			}
 
 			// Add constraint (per sprint): sum of story points taken in sprint i <= sprint i's capacity
@@ -347,7 +478,7 @@ int main(int argc, char* argv[]) {
 			IloNumExpr numberOfTimesStoryIsUsed(env, 0);
 
 			for (int i = 0; i < numberOfSprints; ++i) {
-				numberOfTimesStoryIsUsed += sprints[i][j];
+				numberOfTimesStoryIsUsed += roadmap[i][j];
 			}
 
 			// Story j can be included in sprint i <= 1 times
@@ -369,12 +500,12 @@ int main(int argc, char* argv[]) {
 
 					// Count how many times the dependee has been included between the first sprint and the current sprint
 					for (int sprintLookback = 0; sprintLookback < i; ++sprintLookback) {
-						numberOfTimesDependeesPreAssigned += sprints[sprintLookback][storyToCheck];
+						numberOfTimesDependeesPreAssigned += roadmap[sprintLookback][storyToCheck];
 					}
 
-					// sprints[i][j] == 1 means that dependent story j is taken in sprint i, so dependee story d must appear in previous sprints
-					// sprints[i][j] == 0 means that dependent story j is not taken in sprint i, so dependee story d may or may not appear in previous sprints
-					model.add(IloIfThen(env, sprints[i][j] == 1, numberOfTimesDependeesPreAssigned == 1));
+					// roadmap[i][j] == 1 means that dependent story j is taken in sprint i, so dependee story d must appear in previous roadmap
+					// roadmap[i][j] == 0 means that dependent story j is not taken in sprint i, so dependee story d may or may not appear in previous roadmap
+					model.add(IloIfThen(env, roadmap[i][j] == 1, numberOfTimesDependeesPreAssigned == 1));
 
 					// NOTE - is numberOfTimesDependeesPreAssigned == 1 (per dependee, per story) better than numberOfTimesDependeesPreAssigned == numberOfDependencies (per story)?
 					// i.e. is it better to have more or fewer constraints that check the same thing?
@@ -427,7 +558,7 @@ int main(int argc, char* argv[]) {
 
 					for (int j = 0; j < numberOfStories; ++j) {
 						// If the story was taken in this sprint, print the story's information
-						if (cplex.getValue(sprints[i][j]) == 1) {
+						if (cplex.getValue(roadmap[i][j]) == 1) {
 							businessValueDelivered += storyData[j].businessValue;
 
 							// Running totals for how much the roadmap delivered overall
