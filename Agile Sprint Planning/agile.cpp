@@ -8,44 +8,44 @@ ILOSTLBEGIN
 
 using namespace std;
 
-class Sprint {
-public:
-	int sprintNumber, sprintCapacity, sprintValueBonus;
-
-	Sprint() {};
-
-	Sprint(int num, int cap, int bonus) {
-		this->sprintNumber = num;
-		this->sprintCapacity = cap;
-		this->sprintValueBonus = bonus;
-	}
-
-	string toString() {
-		return ">> Sprint " + to_string(sprintNumber) +
-			" (capacity: " + to_string(sprintCapacity) +
-			", bonus: " + to_string(sprintValueBonus) + ")";
-	}
-};
-
 class Story {
 public:
-	int storyNumber, storyPoints, businessValue;
+	int storyNumber, businessValue, storyPoints;
 	vector<int> dependencies;
-	// TODO - vector<int> relatedStories;
 
 	Story() {};
 
-	Story(int num, int bv, int sp) {
-		this->storyNumber = num;
-		this->businessValue = bv;
-		this->storyPoints = sp;
+	Story(int storyNumber, int businessValue, int storyPoints) {
+		this->storyNumber = storyNumber;
+		this->businessValue = businessValue;
+		this->storyPoints = storyPoints;
 	}
 
-	Story(int num, int bv, int sp, vector<int> d) {
-		this->storyNumber = num;
-		this->businessValue = bv;
-		this->storyPoints = sp;
-		this->dependencies = d;
+	Story(int storyNumber, int businessValue, int storyPoints, vector<int> dependencies) {
+		this->storyNumber = storyNumber;
+		this->businessValue = businessValue;
+		this->storyPoints = storyPoints;
+		this->dependencies = dependencies;
+	}
+
+	string printDependencies() {
+		if (this->dependencies.size() > 0) {
+			string dependenciesString = "";
+
+			for (int i = 0; i < this->dependencies.size(); ++i) {
+				if (i == 0) {
+					dependenciesString += "Story " + to_string(this->dependencies[i]);
+				}
+				else {
+					dependenciesString += ", Story " + to_string(this->dependencies[i]);
+				}
+			}
+
+			return dependenciesString;
+		}
+		else {
+			return "None";
+		}
 	}
 
 	string toString() {
@@ -54,25 +54,24 @@ public:
 			+ ", story points: " + to_string(storyPoints)
 			+ ", dependencies: " + printDependencies() + ")";
 	}
+};
 
-	string printDependencies() {
-		if (dependencies.size() == 0) {
-			return "None";
-		}
-		else {
-			string dependenciesString = "";
+class Sprint {
+public:
+	int sprintNumber, sprintCapacity, sprintBonus;
 
-			for (int i = 0; i < dependencies.size(); ++i) {
-				if (i == 0) {
-					dependenciesString += "Story " + to_string(dependencies[i]);
-				}
-				else {
-					dependenciesString += ", Story " + to_string(dependencies[i]);
-				}
-			}
+	Sprint() {};
 
-			return dependenciesString;
-		}
+	Sprint(int num, int cap, int bonus) {
+		this->sprintNumber = num;
+		this->sprintCapacity = cap;
+		this->sprintBonus = bonus;
+	}
+
+	string toString() {
+		return ">> Sprint " + to_string(sprintNumber) +
+			" (capacity: " + to_string(sprintCapacity) +
+			", bonus: " + to_string(sprintBonus) + ")";
 	}
 };
 
@@ -134,184 +133,103 @@ vector<double> geometricSequence(double a, double r, double n) {
 	return sequence;
 }
 
-/*
-// Adapted from:
-// GeeksforGeeks. (2018). Detect Cycle in a Directed Graph - GeeksforGeeks. [online] Available at: https://www.geeksforgeeks.org/detect-cycle-in-a-graph/ [Accessed 12 Nov. 2018].
-// This function is a variation of DFSUytil() in https://www.geeksforgeeks.org/archives/18212 
-*/
-// Helper function that recursively steps through the directed graph to find a cycle
-bool _isCyclic(int v, bool visited[], bool *recStack, vector <Story> allStories) {
-	if (!visited[v]) {
-		// Mark the current story as visited and part of recursion stack
-		visited[v] = true;
-		recStack[v] = true;
+vector<string> splitString(const string& s, char delimiter) {
+	vector<string> tokens;
+	string token;
+	istringstream tokenStream(s);
 
-		// Recur for all the dependencies of this story 
-		vector<int> dependencies = allStories[v].dependencies;
-
-		vector<int>::iterator i;
-		for (i = dependencies.begin(); i != dependencies.end(); ++i) {
-			int dependeeStoryNumber = *i;
-			if(!visited[dependeeStoryNumber] && _isCyclic(dependeeStoryNumber, visited, recStack, allStories))
-				return true;
-			else if (recStack[dependeeStoryNumber])
-				return true;
-		}
+	while (getline(tokenStream, token, delimiter)) {
+		tokens.push_back(token);
 	}
 
-	recStack[v] = false; // remove the story from recursion stack
-	return false;
-}
-
-/*
-// Adapted from:
-// GeeksforGeeks. (2018). Detect Cycle in a Directed Graph - GeeksforGeeks. [online] Available at: https://www.geeksforgeeks.org/detect-cycle-in-a-graph/ [Accessed 12 Nov. 2018].
-// This function is a variation of DFS() in https://www.geeksforgeeks.org/archives/18212 
-*/
-// Returns true if the DAG of dependencies between stories has a cycle, false if not
-bool isCyclic(vector <Story> allStories) {
-	// Mark all the stories as not visited and not part of recursion stack
-	bool *visited = new bool[allStories.size()];
-	bool *recStack = new bool[allStories.size()];
-
-	for (int i = 0; i < allStories.size(); ++i) {
-		visited[i] = false;
-		recStack[i] = false;
-	}
-
-	// Call the recursive helper function on each story to detect cycles in different DFS trees
-	for (int i = 0; i < allStories.size(); ++i) {
-		if (_isCyclic(i, visited, recStack, allStories))
-			return true;
-	}
-
-	return false;
-}
-
-// Returns a vector of Story objects filled with random values
-vector<Story> randomlyGenerateStories(int numberOfStories, int minBusinessValue, int maxBusinessValue, int minStoryPoints, int maxStoryPoints) {
-	vector<Story> storyData;
-
-	// Geometric sequence of probabilities for the discrete distribution random number generator
-	vector<double> probabilities = geometricSequence(0.5, 0.5, (double)numberOfStories);
-
-	// Create stories with random values
-	for (int i = 0; i < numberOfStories; ++i) {
-		int businessValue = randomInt(minBusinessValue, maxBusinessValue);
-		int storyPoints = randomInt(minStoryPoints, maxStoryPoints);
-
-		storyData.push_back(Story(i, businessValue, storyPoints));
-	}
-
-	for (int i = 0; i < numberOfStories; ++i) {
-		// The maximum number of dependencies that story i can have
-		// (can't force a specific number of dependencies as it might create cycles in the graph of dependencies between stories)
-		int maxNumberOfDependencies = randomIntDiscreteDistribution(probabilities);
-
-		for (int j = 0; j < maxNumberOfDependencies; ++j) {
-			// Pick a random story as a potential dependency of story i
-			int potentialDependee = randomInt(0, numberOfStories - 1);
-
-			// Check if the dependency is the same as story i
-			bool isSelfLoop = potentialDependee == i;
-
-			// Check if the dependency is already a dependency of story i
-			bool isAlreadyDependency = find(storyData[i].dependencies.begin(), storyData[i].dependencies.end(), potentialDependee) != storyData[i].dependencies.end();
-
-			// Retry with another random story
-			if (isSelfLoop || isAlreadyDependency) {
-				--j;
-				continue;
-			}
-
-			// Add the dependency to story i
-			storyData[i].dependencies.push_back(potentialDependee);
-
-			// Check if adding the dependency created a cycle in the graph of dependencies (which makes it unsolvable)
-			bool dependencyCreatesCycle = isCyclic(storyData);
-			
-			if (dependencyCreatesCycle) {
-				// Remove the offending dependency
-				storyData[i].dependencies.pop_back();
-			}
-		}
-	}
-
-	return storyData;
-}
-
-// Returns a vector of Sprint objects filled with random values
-vector<Sprint> randomlyGenerateSprints(int numberOfSprints, int minCapacity, int maxCapacity) {
-	vector<Sprint> sprintData;
-
-	for (int i = 0; i < numberOfSprints; ++i) {
-		int capacity = randomInt(minCapacity, maxCapacity);
-
-		// Sprint(sprintNumber, sprintCapacity, sprintBonus)
-		sprintData.push_back(Sprint(i, capacity, numberOfSprints - i));
-	}
-
-	return sprintData;
+	return tokens;
 }
 
 int main(int argc, char* argv[]) {
 	// Seed the random number generator
 	srand(time(NULL));
 
-	// The number of full time employees able to work on tasks (to estimate the sprint velocity)
-	int numberOfFTEs = 5;
+	vector<Story> storyData;
+	string storyDataFileName;
 
-	// The number of sprints available in the roadmap
-	int numberOfSprints;
 	// Holds the data about each sprint
 	vector<Sprint> sprintData;
-
-	// The number of stories in the product backlog
-	int numberOfStories;
-	// Holds the data about each user story
-	vector<Story> storyData;
-	
-	// If the user wants to see the solution
-	bool showSolution = true;
+	string sprintDataFileName;
 
 	switch (argc) {
-	case 4:
-		if (stoi(argv[3]) == 0) {
-			showSolution = false;
-		}
-
-		// No break statement as case 4 is identical to case 3, with an extra step
 	case 3:
-		numberOfSprints = stoi(argv[1]);
-		numberOfStories = stoi(argv[2]);
-
-		// Generate some test data to optimise
-		storyData = randomlyGenerateStories(numberOfStories, 1, 10, 1, 8);
-		sprintData = randomlyGenerateSprints(numberOfSprints, 0, 8 * numberOfFTEs);
-		
+		storyDataFileName = argv[1];
+		sprintDataFileName = argv[2];
 		break;
 	default:
-		// If no parameters are given, use some hard-coded test data
-		sprintData = {
-			Sprint(0, 7, 4),
-			Sprint(1, 7, 3),
-			Sprint(2, 7, 2),
-			Sprint(3, 7, 1)
-		};
-
-		numberOfSprints = sprintData.size();
-
-		storyData = {
-			Story(0, 2, 6, {}),
-			Story(1, 8, 3, {0}),
-			Story(2, 2, 1, {1}),
-			Story(3, 6, 4, {2})
-		};
-
-		numberOfStories = storyData.size();
-
-		break;
+		exit(0);
 	}
+
+	// Load story data into objects //////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////
+
+	string line;
+	ifstream storiesFile(storyDataFileName);
+
+	getline(storiesFile, line); // Skip column headers
+
+	vector<pair<int, string>> dependenciesStrings;
+
+	if (storiesFile.is_open()) {
+		while (getline(storiesFile, line)) {
+			vector<string> splitLine = splitString(line, ',');
+
+			int storyNumber = stoi(splitLine[0]);
+			int businessValue = stoi(splitLine[1]);
+			int storyPoints = stoi(splitLine[2]);
+
+			storyData.push_back(Story(storyNumber, businessValue, storyPoints));
+
+			if (splitLine.size() == 4) {
+				string dependencyString = splitLine[3];
+
+				vector<string> splitDependencies = splitString(dependencyString, ';');
+
+				for (string dependeeString : splitDependencies) {
+					storyData[storyNumber].dependencies.push_back(stoi(dependeeString));
+				}
+			}
+		}
+	}
+	else {
+		cout << "Cannot open story data file" << endl;
+		exit(0);
+	}
+
+	storiesFile.close();
+
+	// Load sprint data into objects /////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////
+
+	ifstream sprintsFile(sprintDataFileName);
+
+	getline(sprintsFile, line); // Skip column headers
+
+	if (sprintsFile.is_open()) {
+		while (getline(sprintsFile, line)) {
+			vector<string> splitLine = splitString(line, ',');
+
+			int sprintNumber = stoi(splitLine[0]);
+			int sprintCapacity = stoi(splitLine[1]);
+			int sprintBonus = stoi(splitLine[2]);
+
+			sprintData.push_back(Sprint(sprintNumber, sprintCapacity, sprintBonus));
+		}
+	}
+	else {
+		cout << "Cannot open sprint data file" << endl;
+		exit(0);
+	}
+
+	sprintsFile.close();
+
+	int numberOfStories = storyData.size();
+	int numberOfSprints = sprintData.size();
 
 	IloEnv env;
 
@@ -336,7 +254,7 @@ int main(int argc, char* argv[]) {
 				roadmap[i][j] = IloBoolVar(env);
 
 				// Add business value (including sprint bonus), if story is taken in this sprint
-				deliveredValue += storyData[j].businessValue * sprintData[i].sprintValueBonus * roadmap[i][j];
+				deliveredValue += storyData[j].businessValue * sprintData[i].sprintBonus * roadmap[i][j];
 
 				// Add story points, if story j is taken in sprint i
 				storyPointsTaken += storyData[j].storyPoints * roadmap[i][j];
@@ -390,21 +308,15 @@ int main(int argc, char* argv[]) {
 		// Objective function
 		model.add(IloMaximize(env, deliveredValue));
 
-		// Calculate the total size of the product backlog
-
-		int maxBusinessValuePossible = 0;
-		int maxStoryPointsPossible = 0;
-
-		for (int i = 0; i < storyData.size(); ++i) {
-			maxBusinessValuePossible += storyData[i].businessValue;
-			maxStoryPointsPossible += storyData[i].storyPoints;
-		}
-
 		IloCplex cplex(model);
 
 		if (cplex.solve()) {
-			if (showSolution) {
-				cout << endl << "Product backlog: " << endl << endl;
+			int totalStoriesDelivered = 0;
+			int totalBusinessValueDelivered = 0;
+			int totalStoryPointsDelivered = 0;
+
+			if (true) {
+				/*cout << endl << "Product backlog: " << endl << endl;
 
 				for (int i = 0; i < storyData.size(); ++i) {
 					cout << storyData[i].toString() << endl;
@@ -414,13 +326,9 @@ int main(int argc, char* argv[]) {
 
 				for (int i = 0; i < sprintData.size(); ++i) {
 					cout << sprintData[i].toString() << endl;
-				}
+				}*/
 
 				cout << endl << "---------------------------------------------------------" << endl << endl;
-
-				int totalStoriesDelivered = 0;
-				int totalBusinessValueDelivered = 0;
-				int totalStoryPointsDelivered = 0;
 
 				cout << "Sprint plan:" << endl << endl;
 
@@ -429,15 +337,16 @@ int main(int argc, char* argv[]) {
 					// Sprint information
 					cout << sprintData[i].toString() << endl;
 					int businessValueDelivered = 0;
+					int storyPointedDelivered = 0;
 
 					for (int j = 0; j < numberOfStories; ++j) {
 						// If the story was taken in this sprint, print the story's information
 						if (cplex.getValue(roadmap[i][j]) == 1) {
 							businessValueDelivered += storyData[j].businessValue;
+							storyPointedDelivered += storyData[j].storyPoints;
 
 							// Running totals for how much the roadmap delivered overall
 							totalBusinessValueDelivered += storyData[j].businessValue;
-							totalStoriesDelivered += 1;
 							totalStoryPointsDelivered += storyData[j].storyPoints;
 
 							cout << "\t" << storyData[j].toString() << endl;
@@ -445,21 +354,14 @@ int main(int argc, char* argv[]) {
 					}
 
 					// What was delivered in the sprint
-					cout << "-- [Total delivered: " << to_string(businessValueDelivered) << " business value, "
-						<< to_string(businessValueDelivered * sprintData[i].sprintValueBonus) << " weighted business value]" << endl << endl;
+					cout << "-- [Value: " << to_string(businessValueDelivered)
+						<< " (weighted business value: " << to_string(businessValueDelivered * sprintData[i].sprintBonus) << "), "
+						<< "story points: " << to_string(storyPointedDelivered) << "]" << endl << endl;
 				}
-
-				cout << endl << "Solution status: " << cplex.getStatus() << endl << endl;
-				cout << "Stories delivered: " << totalStoriesDelivered << "/" << storyData.size() << " (" << 100.0 * (double)totalStoriesDelivered / (double)storyData.size() << "%)" << endl;
-
-				cout << "Total business value delivered: " << totalBusinessValueDelivered << "/" << maxBusinessValuePossible
-					<< " (" << 100.0 * (double)totalBusinessValueDelivered / (double)maxBusinessValuePossible << "%)" << endl;
-
-				cout << "Total story points delivered: " << totalStoryPointsDelivered << "/" << maxStoryPointsPossible
-					<< " (" << 100.0 * (double)totalStoryPointsDelivered / (double)maxStoryPointsPossible << "%)" << endl;
-
-				cout << endl << "Total weighted business value: " << cplex.getObjValue() << endl << endl;
 			}
+
+			cout << endl << "Solution status: " << cplex.getStatus() << endl;
+			cout << "Total weighted business value: " << cplex.getObjValue() << endl << endl;
 		}
 		else {
 			cout << " No solution found" << endl;
