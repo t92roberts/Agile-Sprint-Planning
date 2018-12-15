@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <set>
 #include <tuple>
+#include <chrono>
 ILOSTLBEGIN
 
 using namespace std;
@@ -260,8 +261,8 @@ int main(int argc, char* argv[]) {
 				storyPointsTaken += storyData[j].storyPoints * roadmap[i][j];
 			}
 
-			// Add constraint (per sprint): sum of story points taken in sprint i <= sprint i's capacity
-			model.add(storyPointsTaken <= sprintData[i].sprintCapacity);
+			// If the sprint has stories assigned, make sure that the sprint is not overloaded
+			model.add(IloIfThen(env, storyPointsTaken > 0, storyPointsTaken <= sprintData[i].sprintCapacity));
 		}
 
 		// Story is only assiged to one (or no) sprint
@@ -283,11 +284,12 @@ int main(int argc, char* argv[]) {
 				// How many dependencies the story has
 				int numberOfDependencies = storyData[j].dependencies.size();
 
+				// No dependency-checking constraints are added for stories with no dependencies
 				for (int d = 0; d < numberOfDependencies; ++d) {
 					// The story number of the dependee story
 					int storyToCheck = storyData[j].dependencies[d];
 
-					// How many times the dependee story has been assigned before to this sprint
+					// How many times the dependee stories havr been assigned before this sprint
 					IloNumExpr numberOfTimesDependeesPreAssigned(env, 0);
 
 					// Count how many times the dependee has been included between the first sprint and the current sprint
@@ -301,6 +303,7 @@ int main(int argc, char* argv[]) {
 
 					// NOTE - is numberOfTimesDependeesPreAssigned == 1 (per dependee, per story) better than numberOfTimesDependeesPreAssigned == numberOfDependencies (per story)?
 					// i.e. is it better to have more or fewer constraints that check the same thing?
+					// It seems to run faster to have a constraint per dependee, per story
 				}
 			}
 		}
@@ -309,13 +312,18 @@ int main(int argc, char* argv[]) {
 		model.add(IloMaximize(env, deliveredValue));
 
 		IloCplex cplex(model);
+		cplex.setOut(env.getNullStream());
+
+		auto t_solveStart = chrono::high_resolution_clock::now();
 
 		if (cplex.solve()) {
+			auto t_solveEnd = chrono::high_resolution_clock::now();
+
 			int totalStoriesDelivered = 0;
 			int totalBusinessValueDelivered = 0;
 			int totalStoryPointsDelivered = 0;
 
-			if (true) {
+			if (false) {
 				/*cout << endl << "Product backlog: " << endl << endl;
 
 				for (int i = 0; i < storyData.size(); ++i) {
@@ -361,7 +369,10 @@ int main(int argc, char* argv[]) {
 			}
 
 			cout << endl << "Solution status: " << cplex.getStatus() << endl;
+			cout << "Solved in " << chrono::duration<double, std::milli>(t_solveEnd - t_solveStart).count() << " ms" << endl << endl;
+			cout << "Stories: " << storyData.size() << ", sprints: " << sprintData.size() << endl;
 			cout << "Total weighted business value: " << cplex.getObjValue() << endl << endl;
+			cout << "--------------------------------------------------------------------------------------------------------" << endl;
 		}
 		else {
 			cout << " No solution found" << endl;
